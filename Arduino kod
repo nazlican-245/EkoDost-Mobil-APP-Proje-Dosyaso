@@ -1,0 +1,48 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial meterSerial(10, 11); // RX, TX
+
+#define TIMEOUT_MS 3000  // 3 saniye timeout
+
+void setup() {
+  Serial.begin(9600);
+  meterSerial.begin(300);  // IEC 62056-21: handshake 300 baud ile başlar
+  delay(500);
+
+  Serial.println("Sayaca istek gonderiliyor...");
+  meterSerial.print("/?!\r\n");  // IEC 62056-21 handshake isteği
+
+  // Yanıt bekle (timeout ile)
+  unsigned long startTime = millis();
+  String response = "";
+
+  while (millis() - startTime < TIMEOUT_MS) {
+    if (meterSerial.available()) {
+      char c = meterSerial.read();
+      response += c;
+      Serial.write(c);
+    }
+  }
+
+  // Yanıt kontrolü
+  if (response.length() == 0) {
+    Serial.println("HATA: Sayactan yanit alinamadi.");
+  } else if (response.indexOf("MAKEL") >= 0 || response.startsWith("/")) {
+    Serial.println("Sayac kimlik dogrulamasi basarili.");
+    // Baud rate artışı: IEC 62056-21 protokolü 300 -> 9600
+    delay(200);
+    meterSerial.begin(9600);
+    Serial.println("Baud rate 9600'e guncellendi.");
+  } else {
+    Serial.println("UYARI: Beklenmeyen yanit formati.");
+    Serial.println(response);
+  }
+}
+
+void loop() {
+  // Baud rate geçişi sonrası veri okuma
+  while (meterSerial.available()) {
+    char c = meterSerial.read();
+    Serial.write(c);
+  }
+}
